@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Simulator Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0f1115;
+            --panel-bg: rgba(20, 22, 27, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-1: #6366f1;
+            --accent-2: #ec4899;
+            --accent-3: #8b5cf6;
+            --fault-color: #ef4444;
+            --hit-color: #10b981;
+            --font-main: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            font-family: var(--font-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%);
+        }
+
+        /* Animated Ambient Background */
+        .ambient-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.5;
+            animation: orbital 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .orb-1 { width: 40vw; height: 40vw; background: var(--accent-1); top: -10%; left: -10%; }
+        .orb-2 { width: 35vw; height: 35vw; background: var(--accent-3); bottom: -10%; right: -5%; animation-duration: 25s; animation-direction: alternate-reverse; }
+        .orb-3 { width: 30vw; height: 30vw; background: var(--accent-2); top: 30%; left: 40%; animation-duration: 30s; }
+
+        @keyframes orbital {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(8vw, 8vw) scale(1.2); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 30px rgba(99, 102, 241, 0.2);
+        }
+
+        p.subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Glass Panel */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 40px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .input-group.small {
+            flex-grow: 0;
+            min-width: 140px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-1);
+            background: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        button.run-btn {
+            padding: 16px 40px;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 57px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button.run-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: all 0.5s ease;
+        }
+
+        button.run-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(255,255,255,0.2);
+        }
+
+        button.run-btn:hover::before {
+            left: 100%;
+        }
+
+        button.run-btn:active {
+            transform: translateY(1px);
+        }
+
+        #output {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        /* Algorithm Sections */
+        .algo-section {
+            background: rgba(20, 22, 27, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            padding: 32px;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s ease;
+        }
+
+        .algo-section:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.04);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .algo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .algo-header h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+        
+        .algo-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-2);
+            box-shadow: 0 0 10px var(--accent-2);
+        }
+
+        .fault-badge {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            padding: 8px 20px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.1);
+        }
+
+        /* Frame container horizontally scrollable */
+        .frame-scroll-container {
+            overflow-x: auto;
+            padding-bottom: 20px;
+            /* Fade edges */
+            mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+        }
+
+        .frame-scroll-container::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .frame-scroll-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+        }
+
+        .frame-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .frame-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .frame-container {
+            display: flex;
+            gap: 16px;
+            width: max-content;
+            padding: 10px;
+        }
+
+        .step-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            opacity: 0;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            width: 60px;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .request-val {
+            text-align: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: #fff;
+            font-size: 1.3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 8px 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .frame-box {
+            display: flex;
+            flex-direction: column;
+            border-radius: 14px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .cell {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 1.4rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .cell:last-child {
+            border-bottom: none;
+        }
+
+        .cell.filled {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.03);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .cell.empty {
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        .status {
+            text-align: center;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 8px 0;
+            border-radius: 12px;
+            margin-top: 4px;
+            letter-spacing: 0.1em;
+        }
+
+        .hit {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+        }
+
+        .fault {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 30px 16px; }
+            h2 { font-size: 2.5rem; }
+            .input-group, .input-group.small { width: 100%; }
+            button.run-btn { width: 100%; }
+            .glass-panel { padding: 24px; }
+            .algo-section { padding: 20px; }
+            .algo-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+            .cell { height: 50px; font-size: 1.2rem; }
+            .step-column { width: 50px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Ambient Background -->
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+
+    <div class="container">
+        <div class="header">
+            <h2>Page Replacement Pro</h2>
+            <p class="subtitle">An advanced visualization tool for analyzing OS memory management algorithms. Experience optimal performance with a deeply immersive interface.</p>
+        </div>
+
+        <div class="glass-panel">
+            <div class="controls">
+                <div class="input-group">
+                    <label for="pages">Target Reference String</label>
+                    <input type="text" id="pages" value="7 0 1 2 0 3 0 4 2 3 0 3 0 3 2 1 2 0 1 7 0 1"
+                        placeholder="e.g. 1 2 3 4 1 2 5 1 2 3 4 5" spellcheck="false">
+                </div>
+
+                <div class="input-group small">
+                    <label for="frames">Memory Frames</label>
+                    <input type="number" id="frames" value="3" min="1" max="10">
+                </div>
+
+                <button class="run-btn" onclick="runAll()">
+                    Initialize Simulation
+                </button>
+            </div>
+        </div>
+
+        <div id="output">
+            <!-- Simulated Output appears here -->
+        </div>
+    </div>
+
+    <script>
+        function drawFrames(title, steps, statusList, faults, pages) {
+            let html = `
+            <div class="algo-section">
+                <div class="algo-header">
+                    <h3>${title}</h3>
+                    <div class="fault-badge">Page Faults: ${faults}</div>
+                </div>
+                <div class="frame-scroll-container">
+                    <div class="frame-container">
+            `;
+
+            for (let i = 0; i < steps.length; i++) {
+                let delay = (i * 0.04).toFixed(2);
+                html += `<div class="step-column" style="animation-delay: ${delay}s">`;
+                html += `<div class="request-val">${pages[i]}</div>`;
+                html += `<div class="frame-box">`;
+
+                for (let j = 0; j < steps[i].length; j++) {
+                    let val = steps[i][j];
+                    if (val === -1) {
+                        html += `<div class="cell empty">-</div>`;
+                    } else {
+                        html += `<div class="cell filled">${val}</div>`;
+                    }
+                }
+
+                html += `</div>`;
+                
+                let isFault = statusList[i] === 'FAULT';
+                html += `<div class="status ${isFault ? 'fault' : 'hit'}">${isFault ? 'F' : 'H'}</div>`;
+                html += `</div>`;
+            }
+
+            html += `
+                    </div>
+                </div>
+            </div>`;
+            return html;
+        }
+
+        function fifo(pages, f) {
+            let frames = Array(f).fill(-1);
+            let index = 0;
+            let steps = [];
+            let status = [];
+            let faults = 0;
+
+            for (let p of pages) {
+                let res = "HIT";
+                if (!frames.includes(p)) {
+                    frames[index] = p;
+                    index = (index + 1) % f;
+                    faults++;
+                    res = "FAULT";
+                }
+                steps.push([...frames]);
+                status.push(res);
+            }
+            return { steps, status, faults };
+        }
+
+        function lru(pages, f) {
+            let frames = Array(f).fill(-1);
+            let last = Array(f).fill(-1);
+            let steps = [];
+            let status = [];
+            let faults = 0;
+
+            for (let i = 0; i < pages.length; i++) {
+                let p = pages[i];
+                let res = "HIT";
+                let idx = frames.indexOf(p);
+
+                if (idx !== -1) {
+                    last[idx] = i;
+                } else {
+                    let empty = frames.indexOf(-1);
+                    if (empty !== -1) {
+                        frames[empty] = p;
+                        last[empty] = i;
+                    } else {
+                        let lru = 0;
+                        for (let j = 1; j < f; j++) {
+                            if (last[j] < last[lru]) lru = j;
+                        }
+                        frames[lru] = p;
+                        last[lru] = i;
+                    }
+                    faults++;
+                    res = "FAULT";
+                }
+                steps.push([...frames]);
+                status.push(res);
+            }
+            return { steps, status, faults };
+        }
+
+        function optimal(pages, f) {
+            let frames = Array(f).fill(-1);
+            let steps = [];
+            let status = [];
+            let faults = 0;
+
+            for (let i = 0; i < pages.length; i++) {
+                let p = pages[i];
+                let res = "HIT";
+
+                if (!frames.includes(p)) {
+                    let idx = frames.indexOf(-1);
+                    if (idx === -1) {
+                        let far = -1, rep = 0;
+                        for (let j = 0; j < f; j++) {
+                            let next = pages.slice(i + 1).indexOf(frames[j]);
+                            if (next === -1) {
+                                rep = j;
+                                break;
+                            }
+                            if (next > far) {
+                                far = next;
+                                rep = j;
+                            }
+                        }
+                        idx = rep;
+                    }
+                    frames[idx] = p;
+                    faults++;
+                    res = "FAULT";
+                }
+                steps.push([...frames]);
+                status.push(res);
+            }
+            return { steps, status, faults };
+        }
+
+        function runAll() {
+            let pagesStr = document.getElementById("pages").value.trim();
+            if (!pagesStr) return;
+
+            let pages = pagesStr.split(/[\s,]+/).map(Number);
+            let f = parseInt(document.getElementById("frames").value);
+
+            pages = pages.filter(p => !isNaN(p));
+
+            if (pages.length === 0 || isNaN(f) || f < 1) {
+                document.getElementById("output").innerHTML = `<div class="algo-section"><div style="color:var(--fault-color);font-weight:600;">Invalid input. Please provide numbers separated by space and Frames >= 1.</div></div>`;
+                return;
+            }
+
+            let fifoR = fifo(pages, f);
+            let lruR = lru(pages, f);
+            let optR = optimal(pages, f);
+
+            let outputDiv = document.getElementById("output");
+            // Clear prior outputs
+            outputDiv.innerHTML = '';
+            
+            // Allow DOM to reset for re-triggering animations
+            setTimeout(() => {
+                outputDiv.innerHTML =
+                    drawFrames("FIFO Algorithm", fifoR.steps, fifoR.status, fifoR.faults, pages) +
+                    drawFrames("LRU Algorithm", lruR.steps, lruR.status, lruR.faults, pages) +
+                    drawFrames("Optimal Algorithm", optR.steps, optR.status, optR.faults, pages);
+            }, 50);
+        }
+
+        // Initialize empty state visualization or default output
+        window.onload = runAll;
+    </script>
+</body>
+</html>
